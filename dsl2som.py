@@ -18,7 +18,7 @@ class DS2LSOM:
 
     Parameters
     ----------
-    minisom_args : dict
+    minisom_args : dict (optional)
         Args passed to MiniSom
 
     method : string {"som", "kmeans"}, default: "som"
