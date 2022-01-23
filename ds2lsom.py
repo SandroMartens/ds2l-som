@@ -3,8 +3,8 @@ import networkx as nx
 import pandas as pd
 from minisom import MiniSom
 from collections import defaultdict
-from sklearn.preprocessing import RobustScaler
 from sklearn.cluster import KMeans
+import logging
 
 """Implementation of the paper
 "Enriched topological learning for cluster detection and visualization" by
@@ -14,7 +14,7 @@ Guénaël Cabanes, Younès Bennani, Dominique Fresneau
 
 
 class DS2LSOM:
-    """Clustering and Visualization learned from SOM prototypes
+    """Clustering learned from SOM prototypes.
 
     Parameters
     ----------
@@ -61,11 +61,13 @@ class DS2LSOM:
         self : Fitted estimator
         """
         sample_size = len(data)
-        self.n_prototypes = int(15 * (sample_size ** (1 / 2)))
+        self.n_prototypes = int(10 * (sample_size ** (1 / 2)))
         self.som_dim = int((self.n_prototypes) ** (1 / 2))
+        # self.som_sigma = 0.1 * self.som_dim
         minisom_args = {
             "x": self.som_dim,
             "y": self.som_dim,
+            "sigma": 1,
             "input_len": data.shape[1],
         }
 
@@ -135,7 +137,7 @@ class DS2LSOM:
         if self.method == "som":
             som = MiniSom(**minisom_args)
             som.pca_weights_init(data)
-            som.train(data=data, num_iteration=10_000)
+            som.train(data=data, num_iteration=20_000)
             return som
 
         elif self.method == "kmeans":
@@ -231,7 +233,7 @@ class DS2LSOM:
         return v
 
     def _get_edges(self):
-        """Find list of node pairs (i, j) s.t. v_{i, j} > threshold
+        """Find list of node pairs (i, j) s.t. v_{i, j} >= threshold
 
         Input
         -----
@@ -260,16 +262,18 @@ class DS2LSOM:
         Graph object with protoypes and gradients between prototypes
         """
         edges = self.edge_list
+        #  Filter out prototypes without samples
+        prototypes = self.prototypes[self.prototypes["d"] > 0]
         prototypes = self.prototypes
         for i in range(len(edges)):
-            edges.loc[i, "gradient"] = -(prototypes.d[edges.loc[i, "source"]]
-            - prototypes.d[edges.loc[i, "target"]])
+            edges.loc[i, "gradient"] = (prototypes.d[edges.loc[i, "target"]] -
+                                        prototypes.d[edges.loc[i, "source"]])
 
         positive_edges = edges[edges.gradient > 0]
         g = nx.from_pandas_edgelist(
             positive_edges,
-            source="target",
-            target="source",
+            source="source",
+            target="target",
             edge_attr="gradient",
             create_using=nx.DiGraph,
         )
@@ -329,7 +333,10 @@ class DS2LSOM:
                 density_max_i = node_i["density"]
                 density_max_j = node_j["density"]
 
+
                 threshold = (1/density_max_i + 1/density_max_j) ** -1
+                # if (density_max_i == 0 or density_j == 0):
+                #     logging.warning(f"Density error: {density_max_i, density_max_j} Threshold: {threshold}")
 
                 if (
                     density_i > threshold
