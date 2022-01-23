@@ -8,8 +8,8 @@ from sklearn.cluster import KMeans
 
 """Implementation of the paper
 "Enriched topological learning for cluster detection and visualization" by
-Guénaël Cabanes, Younès Bennani, Dominique Fresneau  
-10.1016/j.neunet.2012.02.019 
+Guénaël Cabanes, Younès Bennani, Dominique Fresneau
+10.1016/j.neunet.2012.02.019
 """
 
 
@@ -24,12 +24,12 @@ class DS2LSOM:
     method : string {"som", "kmeans"}, default: "som"
         Method to compute prototypes.
 
-    threshold : int (optional, default = 0)
+    threshold : int (optional, default = 1)
         Number of common samples for two prototypes to be considered connected.
 
         Higher: More clusters.
 
-    sigma : num (optional, default = inferred from data)
+    sigma : num (optional, default = inferred from training data)
         Bandwidth parameter for local density estimation.
 
         Too high: All samples influence all prototypes.
@@ -37,7 +37,7 @@ class DS2LSOM:
         Too low: Distant samples will not influence prototypes.
     """
 
-    def __init__(self, minisom_args=None, threshold=0, sigma=None, method="som"):
+    def __init__(self, minisom_args=None, threshold=1, sigma=None, method="som"):
 
         #  Update Minisom args at train time
         self.minisom_args = minisom_args
@@ -57,7 +57,7 @@ class DS2LSOM:
         self : Fitted estimator
         """
         sample_size = len(data)
-        self.n_prototypes = int(10 * (sample_size ** (1 / 2)))
+        self.n_prototypes = int(15 * (sample_size ** (1 / 2)))
         self.som_dim = int((self.n_prototypes) ** (1 / 2))
         minisom_args = {
             "x": self.som_dim,
@@ -131,7 +131,7 @@ class DS2LSOM:
         if self.method == "som":
             som = MiniSom(**minisom_args)
             som.pca_weights_init(data)
-            som.train(data=data, num_iteration=100_000)
+            som.train(data=data, num_iteration=10_000)
             return som
 
         elif self.method == "kmeans":
@@ -173,7 +173,7 @@ class DS2LSOM:
         #  Heuristic for sigma: Mean distance between
         #  prototype and nearest sample.
         if self.sigma is None:
-            self.sigma = np.nanmean(self.dist_matrix.min(axis=1))
+            self.sigma = 2*np.nanmean(self.dist_matrix.min(axis=1))
 
         indices = self.win_map
         densities = np.zeros(shape=(self.som_dim, self.som_dim))
@@ -233,7 +233,7 @@ class DS2LSOM:
         -----
             v: Matrix of connected nodes (v_{i,j} have common samples).
         """
-        indices = np.where(self.nbr_values > self.threshold)
+        indices = np.where(self.nbr_values >= self.threshold)
         groups = set()
         for i in zip(indices[0], indices[1]):
             groups.add(i)
@@ -258,14 +258,14 @@ class DS2LSOM:
         edges = self.edge_list
         prototypes = self.prototypes
         for i in range(len(edges)):
-            edges.loc[i, "gradient"] = prototypes.d[edges.loc[i, "source"]]
-            - prototypes.d[edges.loc[i, "target"]]
+            edges.loc[i, "gradient"] = -(prototypes.d[edges.loc[i, "source"]]
+            - prototypes.d[edges.loc[i, "target"]])
 
         positive_edges = edges[edges.gradient > 0]
         g = nx.from_pandas_edgelist(
             positive_edges,
-            source="source",
-            target="target",
+            source="target",
+            target="source",
             edge_attr="gradient",
             create_using=nx.DiGraph,
         )
@@ -339,8 +339,9 @@ class DS2LSOM:
         self.graph = G
 
     def _merge_micro_clusters(self, G, label_i, label_j, density_i, density_j):
-        """Overwrite label of low density cluster with 
-        label of high density cluster."""
+        """Overwrite label of low density cluster with
+        label of high density cluster.
+        """
         if density_i > density_j:
             new_label = label_i
             old_label = label_j
