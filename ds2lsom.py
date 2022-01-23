@@ -18,8 +18,12 @@ class DS2LSOM:
 
     Parameters
     ----------
-    minisom_args : dict (optional)
-        Args passed to MiniSom
+    minisom_args : dict of dicts (optional)
+        Args passed to MiniSom.
+
+        "init"  : Initialize SOM.
+
+        "train" : Training args.
 
     method : string {"som", "kmeans"}, default: "som"
         Method to compute prototypes.
