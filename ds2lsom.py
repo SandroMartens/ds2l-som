@@ -4,7 +4,7 @@ import pandas as pd
 from minisom import MiniSom
 from collections import defaultdict
 from sklearn.cluster import KMeans
-import logging
+from typing import Union
 
 """Implementation of the paper
 "Enriched topological learning for cluster detection and visualization" by
@@ -48,10 +48,9 @@ class DS2LSOM:
         ) -> None:
 
         methods = ("som", "kmeans")
-        if method not in methods:
+        self.method = method
+        if self.method not in methods:
             raise ValueError(f"{method} is not an method for prototype computation.")
-        else:
-            self.method = method
 
         #  Update Minisom args at train time
         self.minisom_args = minisom_args
@@ -98,7 +97,7 @@ class DS2LSOM:
         if self.method == "som":
             self.dist_matrix = self.som._distance_from_weights(data).T
         elif self.method == "kmeans":
-            self.dist_matrix = self.kmeans.transform(data).T
+            self.dist_matrix = self.som.transform(data).T
 
     def predict(self, data) -> pd.Series:
         """Return the cluster id for each sample.
@@ -132,8 +131,8 @@ class DS2LSOM:
 
         return y.label
 
-    def _get_prototypes(self, data, minisom_args:dict):
-        """Define SOM and train on data.
+    def _get_prototypes(self, data, minisom_args:dict) -> Union[MiniSom,KMeans]:
+        """Define model and train on data.
 
         Input:
         ------
@@ -188,7 +187,7 @@ class DS2LSOM:
         #  Heuristic for sigma: Mean distance between
         #  prototype and nearest sample.
         if self.sigma is None:
-            self.sigma = 2*np.nanmean(self.dist_matrix.min(axis=1))
+            self.sigma = np.nanmean(self.dist_matrix.min(axis=1))
 
         indices = self.win_map
         densities = np.zeros(shape=(self.som_dim, self.som_dim))
@@ -247,11 +246,12 @@ class DS2LSOM:
         Input
         -----
             v: Matrix of connected nodes (v_{i,j} have common samples).
+        Returns
+        -------
+            groups: Indices (source, target) of all edges
         """
-        indices = np.where(self.nbr_values >= self.threshold)
-        groups = set()
-        for i in zip(indices[0], indices[1]):
-            groups.add(i)
+        indices = np.asarray(self.nbr_values >= self.threshold).nonzero()
+        groups = {index for index in zip(indices[0], indices[1])}
         groups = pd.DataFrame(groups, columns=["source", "target"])
 
         return groups
