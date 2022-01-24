@@ -41,7 +41,12 @@ class DS2LSOM:
         Too low: Distant samples will not influence prototypes.
     """
 
-    def __init__(self, minisom_args=None, threshold=1, sigma=None, method="som"):
+    def __init__(self,
+                 minisom_args: dict = None,
+                 threshold: int = 1,
+                 sigma: float = None,
+                 method: str = "som"
+        ) -> None:
 
         #  Update Minisom args at train time
         self.minisom_args = minisom_args
@@ -123,7 +128,7 @@ class DS2LSOM:
 
         return y.label
 
-    def _get_prototypes(self, data, minisom_args):
+    def _get_prototypes(self, data, minisom_args:dict):
         """Define SOM and train on data.
 
         Input:
@@ -232,7 +237,7 @@ class DS2LSOM:
 
         return v
 
-    def _get_edges(self):
+    def _get_edges(self) -> pd.DataFrame:
         """Find list of node pairs (i, j) s.t. v_{i, j} >= threshold
 
         Input
@@ -283,7 +288,7 @@ class DS2LSOM:
 
         return g
 
-    def _initial_clustering(self):
+    def _initial_clustering(self) -> None:
         """Label each prototype by the maximum with the highest gradient."""
         #  Create initial labels
         for node in self.graph:
@@ -311,7 +316,7 @@ class DS2LSOM:
                     largest_gradient_neighbor
                 ]["label"]
 
-    def _final_clustering(self):
+    def _final_clustering(self) -> None:
         """Merge clusters according to pairwise density threshold of clusters.
 
         Input : Graph
@@ -349,7 +354,13 @@ class DS2LSOM:
                     )
         self.graph = G
 
-    def _merge_micro_clusters(self, G, label_i, label_j, density_i, density_j):
+    def _merge_micro_clusters(self, 
+            G, 
+            label_i: int, 
+            label_j: int, 
+            density_i: float, 
+            density_j: float
+        ) -> None:
         """Overwrite label of low density cluster with
         label of high density cluster.
         """
