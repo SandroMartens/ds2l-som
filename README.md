@@ -3,7 +3,7 @@
 DS2L-SOM is clustering algorithm based on Self Organizing Maps (SOM)[^1][^2].
 
 # How to use
-DSL2-SOM tries to follow the Scikit learn API. 
+DSL2-SOM follows the scikit-learn API. 
 
 ```python
 from ds2lsom import DS2LSOM
@@ -14,9 +14,9 @@ labels = clusterer.fit(data).transform(data)
 # Dependencies
 - Pandas
 - Numpy
-- Networkx
+- NetworkX
 - MiniSom
-- SciKit Learn
+- scikit-Learn
 
 # Notes
 Currently work in process
@@ -24,7 +24,6 @@ ToDo:
 - Other methods of creating prototypes (kmeans, neural gas?)
 - Properly implement SOM arguments
 
-# References
 [^1]: _A Local Density-based Simultaneous Two-level Algorithm for
 Topographic Clustering_, Guénaël Cabanes and Younès Bennani,
 2008
