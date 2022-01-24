@@ -40,7 +40,6 @@ class DS2LSOM:
 
         Too low: Distant samples will not influence prototypes.
     """
-
     def __init__(self,
                  minisom_args: dict = None,
                  threshold: int = 1,
@@ -48,11 +47,16 @@ class DS2LSOM:
                  method: str = "som"
         ) -> None:
 
+        methods = ("som", "kmeans")
+        if method not in methods:
+            raise ValueError(f"{method} is not an method for prototype computation.")
+        else:
+            self.method = method
+
         #  Update Minisom args at train time
         self.minisom_args = minisom_args
         self.threshold = threshold
         self.sigma = sigma
-        self.method = method
 
     def fit(self, data):
         """Fit and train SOM, enrich prototypes and return graph of prototypes.
@@ -96,7 +100,7 @@ class DS2LSOM:
         elif self.method == "kmeans":
             self.dist_matrix = self.kmeans.transform(data).T
 
-    def predict(self, data):
+    def predict(self, data) -> pd.Series:
         """Return the cluster id for each sample.
 
         Input
@@ -150,7 +154,7 @@ class DS2LSOM:
             kmeans.fit(data)
             return kmeans
 
-    def _enrich_prototypes(self):
+    def _enrich_prototypes(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Enrich each prototype with a local density estimate,
         a local variability estimate and connected neighbors.
 
@@ -177,7 +181,7 @@ class DS2LSOM:
 
         return v, prototypes
 
-    def _estimate_density(self):
+    def _estimate_density(self) -> np.ndarray:
         """Estimate local density for each prototype 
         from its assigned samples.
         """
@@ -203,7 +207,7 @@ class DS2LSOM:
 
         return densities.flatten()
 
-    def _estimate_local_variability(self):
+    def _estimate_local_variability(self) -> np.ndarray:
         """For each prototype w, variability s is the mean distance
         between w and the L data x_w represented by w.
         """
@@ -220,7 +224,7 @@ class DS2LSOM:
 
         return variabilities.flatten()
 
-    def _estimate_neighborhood_values(self):
+    def _estimate_neighborhood_values(self) -> np.ndarray:
         """For each data x, find the two clostest prototypes
          u*(x) and u**(x) (Best Matching Units, BMUs).
 
@@ -252,7 +256,7 @@ class DS2LSOM:
 
         return groups
 
-    def _create_graph(self):
+    def _create_graph(self) -> nx.DiGraph:
         """Create Graph with edges between prototypes. Edges are directed from
         high density nodes to low density nodes with a positive gradient.
 
@@ -355,7 +359,7 @@ class DS2LSOM:
         self.graph = G
 
     def _merge_micro_clusters(self, 
-            G, 
+            G: nx.DiGraph, 
             label_i: int, 
             label_j: int, 
             density_i: float, 
