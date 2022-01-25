@@ -99,7 +99,7 @@ class DS2LSOM:
         elif self.method == "kmeans":
             self.dist_matrix = self.som.transform(data).T
 
-    def predict(self, data) -> pd.Series:
+    def predict(self, data) -> np.ndarray:
         """Return the cluster id for each sample.
 
         Input
@@ -112,24 +112,30 @@ class DS2LSOM:
         labels : array
             Labels of clusters.
         """
+        if self.method == "som":
+            y = self._predict_som(data)
+        elif self.method == "kmeans":
+            y = self.som.predict(data)
+        return y
+
+    def _predict_som(self, data) -> np.ndarray:
         win_map = self.som.win_map(data, return_indices=True)
         graph = self.graph
-        pred = defaultdict(lambda: -1)
+        pred = dict()
         for prototype_index, samples_indices in win_map.items():
             index_flat = np.ravel_multi_index(
                 prototype_index, (self.som_dim, self.som_dim)
             )
-            if index_flat in self.graph.nodes:
+            if index_flat in self.graph:
                 for sample in samples_indices:
                     pred[sample] = graph.nodes[index_flat]["label"]
             else:
                 for sample in samples_indices:
                     pred[sample] = -1
 
-        y = pd.DataFrame(pred.items(), columns=["sample", "label"])
-        y = y.sort_values("sample")
-
-        return y.label
+            y = pd.DataFrame(pred.items(), columns=["sample", "label"])
+            y = y.sort_values("sample").label
+        return np.array(y)
 
     def _get_prototypes(self, data, minisom_args:dict) -> Union[MiniSom,KMeans]:
         """Define model and train on data.
