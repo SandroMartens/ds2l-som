@@ -1,4 +1,7 @@
-.graphml
 **/prototyping
+**/__pycache__
+**/.vscode
+**/.mypy_cache
+
 prototype.ipynb
 testing.ipynb
