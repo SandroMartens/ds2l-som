@@ -136,23 +136,15 @@ class DS2LSOM:
             self.dist_matrix = self.som.transform(data).T
 
     def _predict_som(self, data) -> np.ndarray:
-        win_map = self.som.win_map(data, return_indices=True)
-        graph = self.graph
-        pred = dict()
-        for prototype_index, samples_indices in win_map.items():
-            index_flat = np.ravel_multi_index(
-                prototype_index, (self.som_dim, self.som_dim)
-            )
-            if index_flat in self.graph:
-                for sample in samples_indices:
-                    pred[sample] = graph.nodes[index_flat]["label"]
+        #  Get Best Matching Prototype
+        pred = self.som._distance_from_weights(data).argsort(axis=-1)[:,0]
+        for sample, prototype in enumerate(pred):
+            if prototype in self.graph:
+                pred[sample] = self.graph.nodes[prototype]["label"]
             else:
-                for sample in samples_indices:
-                    pred[sample] = -1
+                pred[sample] = -1
 
-            y = pd.DataFrame(pred.items(), columns=["sample", "label"])
-            y = y.sort_values("sample").label
-        return np.array(y)
+        return np.array(pred)
 
     def _get_prototypes(self, data, minisom_args:dict) -> Union[MiniSom,KMeans]:
         """Define model and train on data.
@@ -364,7 +356,6 @@ class DS2LSOM:
 
                 density_max_i = node_i["density"]
                 density_max_j = node_j["density"]
-
 
                 threshold = (1/density_max_i + 1/density_max_j) ** -1
                 # if (density_max_i == 0 or density_j == 0):
