@@ -2,7 +2,6 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 from minisom import MiniSom
-from collections import defaultdict
 from sklearn.cluster import KMeans
 from typing import Union
 
@@ -18,6 +17,9 @@ class DS2LSOM:
 
     Parameters
     ----------
+    n_prototypes: int (optional, default = inferred from data)
+        Number of prototypes.
+
     minisom_args : dict of dicts (optional)
         Args passed to MiniSom.
 
@@ -39,12 +41,17 @@ class DS2LSOM:
         Too high: All samples influence all prototypes.
 
         Too low: Distant samples will not influence prototypes.
+    
+    verbose : bool (default = False)
+        Print information about each step.
     """
     def __init__(self,
-                 minisom_args: dict = None,
+                 n_prototypes: int = None,
                  threshold: int = 1,
                  sigma: float = None,
-                 method: str = "som"
+                 method: str = "som",
+                 verbose: bool = False,
+                 minisom_args: dict = None,
         ) -> None:
 
         methods = ("som", "kmeans")
@@ -53,9 +60,11 @@ class DS2LSOM:
             raise ValueError(f"{method} is not an method for prototype computation.")
 
         #  Update Minisom args at train time
+        self.n_prototypes = n_prototypes
         self.minisom_args = minisom_args
         self.threshold = threshold
         self.sigma = sigma
+        self.verbose = verbose
 
     def fit(self, data):
         """Fit and train SOM, enrich prototypes and return graph of prototypes.
@@ -68,8 +77,13 @@ class DS2LSOM:
         -------
         self : Fitted estimator
         """
+        if self.verbose:
+            print("Started training.")
+
         sample_size = len(data)
-        self.n_prototypes = int(10 * (sample_size ** (1 / 2)))
+        if self.n_prototypes is None:
+            self.n_prototypes = int(10 * (sample_size ** (1 / 2)))
+    
         self.som_dim = int((self.n_prototypes) ** (1 / 2))
         # self.som_sigma = 0.1 * self.som_dim
         minisom_args = {
@@ -91,13 +105,9 @@ class DS2LSOM:
         self._initial_clustering()
         self._final_clustering()
 
+        if self.verbose:
+            print("Training finished.")
         return self
-
-    def _get_dist_matrix(self, data):
-        if self.method == "som":
-            self.dist_matrix = self.som._distance_from_weights(data).T
-        elif self.method == "kmeans":
-            self.dist_matrix = self.som.transform(data).T
 
     def predict(self, data) -> np.ndarray:
         """Return the cluster id for each sample.
@@ -117,6 +127,13 @@ class DS2LSOM:
         elif self.method == "kmeans":
             y = self.som.predict(data)
         return y
+
+    def _get_dist_matrix(self, data) -> None:
+        """Calculate distance matrix (i, j) for prototype i and sample j."""
+        if self.method == "som":
+            self.dist_matrix = self.som._distance_from_weights(data).T
+        elif self.method == "kmeans":
+            self.dist_matrix = self.som.transform(data).T
 
     def _predict_som(self, data) -> np.ndarray:
         win_map = self.som.win_map(data, return_indices=True)
@@ -151,11 +168,11 @@ class DS2LSOM:
         if self.method == "som":
             som = MiniSom(**minisom_args)
             som.pca_weights_init(data)
-            som.train(data=data, num_iteration=20_000)
+            som.train(data=data, num_iteration=20_000, verbose=self.verbose)
             return som
 
         elif self.method == "kmeans":
-            kmeans = KMeans(n_clusters=self.n_prototypes)
+            kmeans = KMeans(n_clusters=self.n_prototypes, verbose=self.verbose)
             kmeans.fit(data)
             return kmeans
 
