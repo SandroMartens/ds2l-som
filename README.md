@@ -8,7 +8,7 @@ DSL2-SOM follows the scikit-learn API.
 ```python
 from ds2lsom import DS2LSOM
 clusterer = DS2LSOM()
-labels = clusterer.fit(data).transform(data)
+labels = clusterer.fit(data).predict(data)
 ```
 
 # Dependencies
@@ -16,7 +16,7 @@ labels = clusterer.fit(data).transform(data)
 - Numpy
 - NetworkX
 - MiniSom
-- scikit-Learn
+- scikit-learn
 
 # Notes
 Currently work in process
