@@ -354,13 +354,10 @@ class DS2LSOM:
                 density_i = node_i["density"]
                 density_j = node_j["density"]
 
-                density_max_i = node_i["density"]
-                density_max_j = node_j["density"]
+                density_max_i = G.nodes[label_i]["density"]
+                density_max_j = G.nodes[label_j]["density"]
 
                 threshold = (1/density_max_i + 1/density_max_j) ** -1
-                # if (density_max_i == 0 or density_j == 0):
-                #     logging.warning(f"Density error: {density_max_i, density_max_j} Threshold: {threshold}")
-
                 if (
                     density_i > threshold
                     and density_j > threshold
@@ -368,7 +365,11 @@ class DS2LSOM:
                 ):
                     cont = True
                     self._merge_micro_clusters(
-                        G, label_i, label_j, density_i, density_j
+                        G, 
+                        label_i, 
+                        label_j, 
+                        density_max_i, 
+                        density_max_j
                     )
         self.graph = G
 
@@ -376,13 +377,13 @@ class DS2LSOM:
             G: nx.DiGraph, 
             label_i: int, 
             label_j: int, 
-            density_i: float, 
-            density_j: float
+            density_max_i: float, 
+            density_max_j: float
         ) -> None:
         """Overwrite label of low density cluster with
         label of high density cluster.
         """
-        if density_i > density_j:
+        if density_max_i > density_max_j:
             new_label = label_i
             old_label = label_j
         else:
