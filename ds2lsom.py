@@ -20,12 +20,12 @@ class DS2LSOM:
     n_prototypes: int (optional, default = inferred from data)
         Number of prototypes.
 
-    minisom_args : dict of dicts (optional)
-        Args passed to MiniSom.
+    model_args : dict of dicts (optional)
+        Args passed to the vector quantization algorithm. 
 
-        "init"  : Initialize SOM.
+        "init" goes to initialization.
 
-        "train" : Training args.
+        "train" goes to fitting/training.
 
     method : string {"som", "kmeans"}, default: "som"
         Method to compute prototypes.
@@ -41,7 +41,7 @@ class DS2LSOM:
         Too high: All samples influence all prototypes.
 
         Too low: Distant samples will not influence prototypes.
-    
+
     verbose : bool (default = False)
         Print information about each step.
     """
@@ -51,7 +51,7 @@ class DS2LSOM:
                  sigma: float = None,
                  method: str = "som",
                  verbose: bool = False,
-                 minisom_args: dict = None,
+                 model_args: dict = None,
         ) -> None:
 
         methods = ("som", "kmeans")
@@ -61,7 +61,7 @@ class DS2LSOM:
 
         #  Update Minisom args at train time
         self.n_prototypes = n_prototypes
-        self.minisom_args = minisom_args
+        self.model_args = model_args
         self.threshold = threshold
         self.sigma = sigma
         self.verbose = verbose
@@ -86,18 +86,10 @@ class DS2LSOM:
     
         self.som_dim = int((self.n_prototypes) ** (1 / 2))
         self.n_prototypes = self.som_dim ** 2
+        num_iteration = 2 * len(data)
         # self.som_sigma = 0.1 * self.som_dim
-        minisom_args = {
-            "x": self.som_dim,
-            "y": self.som_dim,
-            "sigma": 1,
-            "input_len": data.shape[1],
-        }
 
-        if self.minisom_args is not None:
-            minisom_args.update(self.minisom_args)
-
-        self.som = self._get_prototypes(data, minisom_args)
+        self.som = self._get_prototypes(data)
         # self.win_map = self.som.win_map(data, return_indices=True)
         self._get_dist_matrix(data)
         self.nbr_values, self.prototypes = self._enrich_prototypes()
@@ -143,7 +135,7 @@ class DS2LSOM:
         elif self.method == "kmeans":
             self.dist_matrix = self.som.transform(data).T
 
-    def _get_prototypes(self, data, minisom_args:dict) -> Union[MiniSom,KMeans]:
+    def _get_prototypes(self, data) -> Union[MiniSom,KMeans]:
         """Define model and train on data.
 
         Input:
@@ -155,14 +147,41 @@ class DS2LSOM:
         Trained SOM Object
         """
         if self.method == "som":
-            som = MiniSom(**minisom_args)
+            minisom_args_default = {
+                "init": {
+                    "x": self.som_dim,
+                    "y": self.som_dim,
+                    "input_len": data.shape[1],
+                },
+                "train": {
+                    "num_iteration": 2 * len(data)
+                }
+            }
+
+            if self.model_args is not None:
+                minisom_args_default["init"].update(self.model_args["init"])
+                minisom_args_default["train"].update(self.model_args["train"])
+
+            som = MiniSom(**minisom_args_default["init"])
             som.pca_weights_init(data)
-            som.train(data=data, num_iteration=20_000, verbose=self.verbose)
+            som.train(data=data, **minisom_args_default["train"])
             return som
 
         elif self.method == "kmeans":
-            kmeans = KMeans(n_clusters=self.n_prototypes, verbose=self.verbose)
-            kmeans.fit(data)
+            kmeans_args_default = {
+                "init": {
+                    "n_clusters": self.n_prototypes
+                },
+                "train": {
+                    "sample_weight": None
+                }
+            }
+
+            if self.model_args is not None:
+                kmeans_args_default["init"].update(self.model_args["init"])
+                kmeans_args_default["train"].update(self.model_args["train"])
+            kmeans = KMeans(**kmeans_args_default["init"], verbose=self.verbose)
+            kmeans.fit(X=data, **kmeans_args_default["train"])
             return kmeans
 
     def _enrich_prototypes(self) -> tuple[pd.DataFrame, pd.DataFrame]:
