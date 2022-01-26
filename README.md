@@ -19,11 +19,9 @@ labels = clusterer.fit(data).predict(data)
 - scikit-learn
 
 # Notes
-Currently work in process
-
 ToDo:
-- Other methods of creating prototypes (neural gas?)
-- Properly implement SOM arguments
+- Other methods of creating prototypes (vector quantization, neural gas)
+- Examples
 
 [^1]: _A Local Density-based Simultaneous Two-level Algorithm for
 Topographic Clustering_, Guénaël Cabanes and Younès Bennani,
