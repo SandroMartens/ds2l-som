@@ -85,6 +85,7 @@ class DS2LSOM:
             self.n_prototypes = int(10 * (sample_size ** (1 / 2)))
     
         self.som_dim = int((self.n_prototypes) ** (1 / 2))
+        self.n_prototypes = self.som_dim ** 2
         # self.som_sigma = 0.1 * self.som_dim
         minisom_args = {
             "x": self.som_dim,
@@ -122,11 +123,18 @@ class DS2LSOM:
         labels : array
             Labels of clusters.
         """
+        #  Get Best Matching Prototype
         if self.method == "som":
-            y = self._predict_som(data)
-        elif self.method == "kmeans":
-            y = self.som.predict(data)
-        return y
+            pred = self.som._distance_from_weights(data).argsort(axis=-1)[:,0]
+        else:
+            pred = self.som.transform(data).argsort(axis=-1)[:,0]
+
+        for sample, prototype in enumerate(pred):
+            if prototype in self.graph:
+                pred[sample] = self.graph.nodes[prototype]["label"]
+            else:
+                pred[sample] = -1
+        return np.array(pred)
 
     def _get_dist_matrix(self, data) -> None:
         """Calculate distance matrix (i, j) for prototype i and sample j."""
@@ -134,17 +142,6 @@ class DS2LSOM:
             self.dist_matrix = self.som._distance_from_weights(data).T
         elif self.method == "kmeans":
             self.dist_matrix = self.som.transform(data).T
-
-    def _predict_som(self, data) -> np.ndarray:
-        #  Get Best Matching Prototype
-        pred = self.som._distance_from_weights(data).argsort(axis=-1)[:,0]
-        for sample, prototype in enumerate(pred):
-            if prototype in self.graph:
-                pred[sample] = self.graph.nodes[prototype]["label"]
-            else:
-                pred[sample] = -1
-
-        return np.array(pred)
 
     def _get_prototypes(self, data, minisom_args:dict) -> Union[MiniSom,KMeans]:
         """Define model and train on data.
