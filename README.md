@@ -20,8 +20,9 @@ labels = clusterer.fit(data).predict(data)
 
 # Notes
 Currently work in process
+
 ToDo:
-- Other methods of creating prototypes (kmeans, neural gas?)
+- Other methods of creating prototypes (neural gas?)
 - Properly implement SOM arguments
 
 [^1]: _A Local Density-based Simultaneous Two-level Algorithm for
