@@ -201,12 +201,14 @@ class DS2LSOM:
         if self.sigma is None:
             self.sigma = np.nanmean(self.dist_matrix.min(axis=1))
 
+        #  Distances of samples where clostest prototype is prototype
+        dist_matrix_sorted = self.dist_matrix.argsort(axis=0)[0]
         densities = np.zeros(shape=(self.som_dim * self.som_dim))
         for prototype in range(len(self.dist_matrix)):
-            #  Distances of samples where clostest prototype is prototype
             neighbors = self.dist_matrix[
                 prototype, 
-                self.dist_matrix.argsort(axis=0)[0]==prototype]
+                dist_matrix_sorted==prototype
+            ]
             neighbors = neighbors ** 2
             neighbors = np.e ** -(neighbors / (2 * self.sigma**2))
             neighbors = neighbors / self.sigma * np.sqrt(2*np.pi)
@@ -222,12 +224,14 @@ class DS2LSOM:
         """For each prototype w, variability s is the mean distance
         between w and the L data x_w represented by w.
         """
+        #  Distances of samples where clostest prototype is prototype
+        dist_matrix_sorted = self.dist_matrix.argsort(axis=0)[0]
         variabilities = np.zeros(shape=(self.som_dim* self.som_dim))
         for prototype in range(len(self.dist_matrix)):
-            #  Distances of samples where clostest prototype is prototype
             neighbors = self.dist_matrix[
                 prototype, 
-                self.dist_matrix.argsort(axis=0)[0]==prototype]
+                dist_matrix_sorted==prototype
+            ]
             #  Surpress warning about empty slices
             if len(neighbors) > 0:
                 variabilities[prototype] = np.mean(neighbors)
