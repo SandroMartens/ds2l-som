@@ -97,7 +97,7 @@ class DS2LSOM:
             minisom_args.update(self.minisom_args)
 
         self.som = self._get_prototypes(data, minisom_args)
-        self.win_map = self.som.win_map(data, return_indices=True)
+        # self.win_map = self.som.win_map(data, return_indices=True)
         self._get_dist_matrix(data)
         self.nbr_values, self.prototypes = self._enrich_prototypes()
         self.edge_list = self._get_edges()
@@ -204,39 +204,32 @@ class DS2LSOM:
         if self.sigma is None:
             self.sigma = np.nanmean(self.dist_matrix.min(axis=1))
 
-        indices = self.win_map
-        densities = np.zeros(shape=(self.som_dim, self.som_dim))
-
-        for prototype_index, samples_indices in indices.items():
-            index_flat = np.ravel_multi_index(
-                prototype_index, (self.som_dim, self.som_dim)
-            )
-            neighbors = self.dist_matrix[index_flat, samples_indices]
+        densities = np.zeros(shape=(self.som_dim * self.som_dim))
+        for prototype in range(len(self.dist_matrix)):
+            #  Distances of samples where clostest prototype is prototype
+            neighbors = self.dist_matrix[
+                prototype, 
+                self.dist_matrix.argsort(axis=0)[0]==prototype]
             neighbors = neighbors ** 2
-            neighbors = np.e ** -(neighbors / (2 * self.sigma ** 2))
-            neighbors = neighbors / self.sigma * np.sqrt(2 * np.pi)
-            neighbors = np.mean(neighbors)
+            neighbors = np.e ** -(neighbors / (2 * self.sigma**2))
+            neighbors = neighbors / self.sigma * np.sqrt(2*np.pi)
+            densities[prototype] = np.mean(neighbors)
 
-            densities[prototype_index] = np.mean(neighbors)
-
-        return densities.flatten()
+        return densities
 
     def _estimate_local_variability(self) -> np.ndarray:
         """For each prototype w, variability s is the mean distance
         between w and the L data x_w represented by w.
         """
-        indices = self.win_map
-        variabilities = np.zeros(shape=(self.som_dim, self.som_dim))
+        variabilities = np.zeros(shape=(self.som_dim* self.som_dim))
+        for prototype in range(len(self.dist_matrix)):
+            #  Distances of samples where clostest prototype is prototype
+            neighbors = self.dist_matrix[
+                prototype, 
+                self.dist_matrix.argsort(axis=0)[0]==prototype]
+            variabilities[prototype] = neighbors.mean()
 
-        for prototype_index, samples_indices in indices.items():
-            index_flat = np.ravel_multi_index(
-                prototype_index, (self.som_dim, self.som_dim)
-            )
-            variabilities[prototype_index] = self.dist_matrix[
-                index_flat, samples_indices
-            ].mean()
-
-        return variabilities.flatten()
+        return variabilities
 
     def _estimate_neighborhood_values(self) -> np.ndarray:
         """For each data x, find the two clostest prototypes
