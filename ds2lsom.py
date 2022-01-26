@@ -154,7 +154,7 @@ class DS2LSOM:
                     "input_len": data.shape[1],
                 },
                 "train": {
-                    "num_iteration": 2 * len(data)
+                    "num_iteration": 5 * len(data)
                 }
             }
 
@@ -287,10 +287,10 @@ class DS2LSOM:
             groups: Indices (source, target) of all edges
         """
         indices = np.asarray(self.nbr_values >= self.threshold).nonzero()
-        groups = {index for index in zip(indices[0], indices[1])}
-        groups = pd.DataFrame(groups, columns=["source", "target"])
+        edges = {index for index in zip(indices[0], indices[1])}
+        edges = pd.DataFrame(edges, columns=["source", "target"])
 
-        return groups
+        return edges
 
     def _create_graph(self) -> nx.DiGraph:
         """Create Graph with edges between prototypes. Edges are directed from
@@ -308,7 +308,7 @@ class DS2LSOM:
         """
         edges = self.edge_list
         #  Filter out prototypes without samples
-        prototypes = self.prototypes[self.prototypes["d"] > 0]
+        # prototypes = self.prototypes[self.prototypes["d"] > 0]
         prototypes = self.prototypes
         for i in range(len(edges)):
             edges.loc[i, "gradient"] = (prototypes.d[edges.loc[i, "target"]] -
@@ -376,8 +376,12 @@ class DS2LSOM:
 
                 density_max_i = G.nodes[label_i]["density"]
                 density_max_j = G.nodes[label_j]["density"]
+                
+                if density_max_i > 0 and density_max_j > 0:
+                    threshold = (1/density_max_i + 1/density_max_j) ** -1
+                else:
+                    threshold = 0
 
-                threshold = (1/density_max_i + 1/density_max_j) ** -1
                 if (
                     density_i > threshold
                     and density_j > threshold
