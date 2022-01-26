@@ -126,7 +126,7 @@ class DS2LSOM:
         #  Get Best Matching Prototype
         if self.method == "som":
             pred = self.som._distance_from_weights(data).argsort(axis=-1)[:,0]
-        else:
+        elif self.method == "kmeans":
             pred = self.som.transform(data).argsort(axis=-1)[:,0]
 
         for sample, prototype in enumerate(pred):
@@ -210,7 +210,11 @@ class DS2LSOM:
             neighbors = neighbors ** 2
             neighbors = np.e ** -(neighbors / (2 * self.sigma**2))
             neighbors = neighbors / self.sigma * np.sqrt(2*np.pi)
-            densities[prototype] = np.mean(neighbors)
+            #  Surpress warning about empty slices
+            if len(neighbors) > 0:
+                densities[prototype] = np.mean(neighbors)
+            else:
+                densities[prototype] = 0
 
         return densities
 
@@ -224,7 +228,11 @@ class DS2LSOM:
             neighbors = self.dist_matrix[
                 prototype, 
                 self.dist_matrix.argsort(axis=0)[0]==prototype]
-            variabilities[prototype] = neighbors.mean()
+            #  Surpress warning about empty slices
+            if len(neighbors) > 0:
+                variabilities[prototype] = np.mean(neighbors)
+            else:
+                variabilities[prototype] = 0
 
         return variabilities
 
@@ -313,17 +321,16 @@ class DS2LSOM:
                 #  get largest gradient neighbor
                 largest_gradient = 0
                 largest_gradient_neighbor = node
-                for edge in edges.items():
-                    current_neighbor = edge[0]
-                    current_gradient = edge[1]["gradient"]
+                for neighbor, attributes in edges.items():
+                    current_neighbor = neighbor
+                    current_gradient = attributes["gradient"]
 
                     if current_gradient > largest_gradient:
                         largest_gradient = current_gradient
                         largest_gradient_neighbor = current_neighbor
 
                 self.graph.nodes[node]["label"] = self.graph.nodes[
-                    largest_gradient_neighbor
-                ]["label"]
+                    largest_gradient_neighbor]["label"]
 
     def _final_clustering(self) -> None:
         """Merge clusters according to pairwise density threshold of clusters.
