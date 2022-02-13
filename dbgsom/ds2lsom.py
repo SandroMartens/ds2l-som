@@ -13,7 +13,7 @@ Guénaël Cabanes, Younès Bennani, Dominique Fresneau
 
 
 class DS2LSOM:
-    """Clustering learned from SOM prototypes.
+    """Clustering learned from vector prototypes.
 
     Parameters
     ----------
@@ -66,7 +66,7 @@ class DS2LSOM:
         self.sigma = sigma
         self.verbose = verbose
 
-    def fit(self, data):
+    def fit(self, data) -> None:
         """Fit and train SOM, enrich prototypes and return graph of prototypes.
 
         Parameters
@@ -83,10 +83,9 @@ class DS2LSOM:
         sample_size = len(data)
         if self.n_prototypes is None:
             self.n_prototypes = int(10 * (sample_size ** (1 / 2)))
-    
+
         self.som_dim = int((self.n_prototypes) ** (1 / 2))
         self.n_prototypes = self.som_dim ** 2
-        num_iteration = 2 * len(data)
         # self.som_sigma = 0.1 * self.som_dim
 
         self.som = self._get_prototypes(data)
@@ -100,7 +99,6 @@ class DS2LSOM:
 
         if self.verbose:
             print("Training finished.")
-        return self
 
     def predict(self, data) -> np.ndarray:
         """Return the cluster id for each sample.
@@ -135,7 +133,7 @@ class DS2LSOM:
         elif self.method == "kmeans":
             self.dist_matrix = self.som.transform(data).T
 
-    def _get_prototypes(self, data) -> Union[MiniSom,KMeans]:
+    def _get_prototypes(self, data) -> Union[MiniSom, KMeans]:
         """Define model and train on data.
 
         Input:
@@ -154,6 +152,7 @@ class DS2LSOM:
                     "input_len": data.shape[1],
                 },
                 "train": {
+                    #  Five batches
                     "num_iteration": 5 * len(data)
                 }
             }
@@ -397,12 +396,13 @@ class DS2LSOM:
                     )
         self.graph = G
 
-    def _merge_micro_clusters(self, 
-            G: nx.DiGraph, 
-            label_i: int, 
-            label_j: int, 
-            density_max_i: float, 
-            density_max_j: float
+    def _merge_micro_clusters(
+        self, 
+        G: nx.DiGraph, 
+        label_i: int, 
+        label_j: int, 
+        density_max_i: float, 
+        density_max_j: float
         ) -> None:
         """Overwrite label of low density cluster with
         label of high density cluster.
