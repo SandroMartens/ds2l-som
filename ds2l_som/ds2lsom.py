@@ -21,7 +21,7 @@ class DS2LSOM:
         Number of prototypes.
 
     model_args : dict of dicts (optional)
-        Args passed to the vector quantization algorithm. 
+        Args passed to the vector quantization algorithm.
 
         "init" goes to initialization.
 
@@ -45,14 +45,16 @@ class DS2LSOM:
     verbose : bool (default = False)
         Print information about each step.
     """
-    def __init__(self,
-                 n_prototypes: int = None,
-                 threshold: int = 1,
-                 sigma: float = None,
-                 method: str = "som",
-                 verbose: bool = False,
-                 model_args: dict = None,
-        ) -> None:
+
+    def __init__(
+        self,
+        n_prototypes: int = None,
+        threshold: int = 1,
+        sigma: float = None,
+        method: str = "som",
+        verbose: bool = False,
+        model_args: dict = None,
+    ) -> None:
 
         methods = ("som", "kmeans")
         self.method = method
@@ -85,7 +87,7 @@ class DS2LSOM:
             self.n_prototypes = int(10 * (sample_size ** (1 / 2)))
 
         self.som_dim = int((self.n_prototypes) ** (1 / 2))
-        self.n_prototypes = self.som_dim ** 2
+        self.n_prototypes = self.som_dim**2
         # self.som_sigma = 0.1 * self.som_dim
 
         self.som = self._get_prototypes(data)
@@ -115,9 +117,9 @@ class DS2LSOM:
         """
         #  Get Best Matching Prototype
         if self.method == "som":
-            pred = self.som._distance_from_weights(data).argsort(axis=-1)[:,0]
+            pred = self.som._distance_from_weights(data).argsort(axis=-1)[:, 0]
         elif self.method == "kmeans":
-            pred = self.som.transform(data).argsort(axis=-1)[:,0]
+            pred = self.som.transform(data).argsort(axis=-1)[:, 0]
 
         for sample, prototype in enumerate(pred):
             if prototype in self.graph:
@@ -153,8 +155,9 @@ class DS2LSOM:
                 },
                 "train": {
                     #  Five batches
-                    "num_iteration": 5 * len(data)
-                }
+                    "num_iteration": 5
+                    * len(data)
+                },
             }
 
             if self.model_args is not None:
@@ -168,12 +171,8 @@ class DS2LSOM:
 
         elif self.method == "kmeans":
             kmeans_args_default = {
-                "init": {
-                    "n_clusters": self.n_prototypes
-                },
-                "train": {
-                    "sample_weight": None
-                }
+                "init": {"n_clusters": self.n_prototypes},
+                "train": {"sample_weight": None},
             }
 
             if self.model_args is not None:
@@ -211,7 +210,7 @@ class DS2LSOM:
         return v, prototypes
 
     def _estimate_density(self) -> np.ndarray:
-        """Estimate local density for each prototype 
+        """Estimate local density for each prototype
         from its assigned samples.
         """
         #  Heuristic for sigma: Mean distance between
@@ -223,13 +222,10 @@ class DS2LSOM:
         dist_matrix_sorted = self.dist_matrix.argsort(axis=0)[0]
         densities = np.zeros(shape=(self.som_dim * self.som_dim))
         for prototype in range(len(self.dist_matrix)):
-            neighbors = self.dist_matrix[
-                prototype, 
-                dist_matrix_sorted==prototype
-            ]
-            neighbors = neighbors ** 2
+            neighbors = self.dist_matrix[prototype, dist_matrix_sorted == prototype]
+            neighbors = neighbors**2
             neighbors = np.e ** -(neighbors / (2 * self.sigma**2))
-            neighbors = neighbors / self.sigma * np.sqrt(2*np.pi)
+            neighbors = neighbors / self.sigma * np.sqrt(2 * np.pi)
             #  Surpress warning about empty slices
             if len(neighbors) > 0:
                 densities[prototype] = np.mean(neighbors)
@@ -244,12 +240,9 @@ class DS2LSOM:
         """
         #  Distances of samples where clostest prototype is prototype
         dist_matrix_sorted = self.dist_matrix.argsort(axis=0)[0]
-        variabilities = np.zeros(shape=(self.som_dim* self.som_dim))
+        variabilities = np.zeros(shape=(self.som_dim * self.som_dim))
         for prototype in range(len(self.dist_matrix)):
-            neighbors = self.dist_matrix[
-                prototype, 
-                dist_matrix_sorted==prototype
-            ]
+            neighbors = self.dist_matrix[prototype, dist_matrix_sorted == prototype]
             #  Surpress warning about empty slices
             if len(neighbors) > 0:
                 variabilities[prototype] = np.mean(neighbors)
@@ -265,7 +258,7 @@ class DS2LSOM:
         Compute the number v_{i,j} of data having i and j as first two BMUs
         """
         BMUs = np.argsort(self.dist_matrix, axis=0)[:2, :]
-        v = np.zeros(shape=(self.som_dim ** 2, self.som_dim ** 2))
+        v = np.zeros(shape=(self.som_dim**2, self.som_dim**2))
         u, counts = np.unique(BMUs, axis=1, return_counts=True)
         u = u.T
         for index, combination in enumerate(u):
@@ -310,8 +303,10 @@ class DS2LSOM:
         # prototypes = self.prototypes[self.prototypes["d"] > 0]
         prototypes = self.prototypes
         for i in range(len(edges)):
-            edges.loc[i, "gradient"] = (prototypes.d[edges.loc[i, "target"]] -
-                                        prototypes.d[edges.loc[i, "source"]])
+            edges.loc[i, "gradient"] = (
+                prototypes.d[edges.loc[i, "target"]]
+                - prototypes.d[edges.loc[i, "source"]]
+            )
 
         positive_edges = edges[edges.gradient > 0]
         g = nx.from_pandas_edgelist(
@@ -352,7 +347,8 @@ class DS2LSOM:
                         largest_gradient_neighbor = current_neighbor
 
                 self.graph.nodes[node]["label"] = self.graph.nodes[
-                    largest_gradient_neighbor]["label"]
+                    largest_gradient_neighbor
+                ]["label"]
 
     def _final_clustering(self) -> None:
         """Merge clusters according to pairwise density threshold of clusters.
@@ -375,9 +371,9 @@ class DS2LSOM:
 
                 density_max_i = G.nodes[label_i]["density"]
                 density_max_j = G.nodes[label_j]["density"]
-                
+
                 if density_max_i > 0 and density_max_j > 0:
-                    threshold = (1/density_max_i + 1/density_max_j) ** -1
+                    threshold = (1 / density_max_i + 1 / density_max_j) ** -1
                 else:
                     threshold = 0
 
@@ -388,22 +384,18 @@ class DS2LSOM:
                 ):
                     cont = True
                     self._merge_micro_clusters(
-                        G, 
-                        label_i, 
-                        label_j, 
-                        density_max_i, 
-                        density_max_j
+                        G, label_i, label_j, density_max_i, density_max_j
                     )
         self.graph = G
 
     def _merge_micro_clusters(
-        self, 
-        G: nx.DiGraph, 
-        label_i: int, 
-        label_j: int, 
-        density_max_i: float, 
-        density_max_j: float
-        ) -> None:
+        self,
+        G: nx.DiGraph,
+        label_i: int,
+        label_j: int,
+        density_max_i: float,
+        density_max_j: float,
+    ) -> None:
         """Overwrite label of low density cluster with
         label of high density cluster.
         """

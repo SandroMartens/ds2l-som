@@ -1,0 +1,9 @@
+README.md
+setup.py
+ds2l_som/__init__.py
+ds2l_som/ds2lsom.py
+ds2l_som.egg-info/PKG-INFO
+ds2l_som.egg-info/SOURCES.txt
+ds2l_som.egg-info/dependency_links.txt
+ds2l_som.egg-info/requires.txt
+ds2l_som.egg-info/top_level.txt
