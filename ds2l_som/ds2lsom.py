@@ -1,23 +1,24 @@
-import numpy as np
+from typing import Union
+
 import networkx as nx
+import numpy as np
 import pandas as pd
 from minisom import MiniSom
 from sklearn.cluster import KMeans
-from typing import Union
-
-"""Implementation of the paper
-"Enriched topological learning for cluster detection and visualization" by
-Guénaël Cabanes, Younès Bennani, Dominique Fresneau
-10.1016/j.neunet.2012.02.019
-"""
+from sklearn.metrics import pairwise_distances
 
 
 class DS2LSOM:
     """Clustering learned from vector prototypes.
 
+    Implementation of the paper
+    "Enriched topological learning for cluster detection and visualization"
+    by Guénaël Cabanes, Younès Bennani, Dominique Fresneau
+    10.1016/j.neunet.2012.02.019
+
     Parameters
     ----------
-    n_prototypes: int (optional, default = inferred from data)
+    n_prototypes: int (optional) default = inferred from data
         Number of prototypes.
 
     model_args : dict of dicts (optional)
@@ -27,30 +28,30 @@ class DS2LSOM:
 
         "train" goes to fitting/training.
 
-    method : string {"som", "kmeans"}, default: "som"
+    method : {"som", "kmeans"}
         Method to compute prototypes.
 
-    threshold : int (optional, default = 1)
+    threshold : int (optional), default = 1
         Number of common samples for two prototypes to be considered connected.
 
         Higher: More clusters.
 
-    sigma : num (optional, default = inferred from training data)
+    sigma : num (optional), default = inferred from training data
         Bandwidth parameter for local density estimation.
 
         Too high: All samples influence all prototypes.
 
         Too low: Distant samples will not influence prototypes.
 
-    verbose : bool (default = False)
+    verbose : bool, default = False
         Print information about each step.
     """
 
     def __init__(
         self,
-        n_prototypes: int = None,
+        n_prototypes: Union[int, None] = None,
         threshold: int = 1,
-        sigma: float = None,
+        sigma: Union[float, None] = None,
         method: str = "som",
         verbose: bool = False,
         model_args: dict = None,
@@ -88,9 +89,8 @@ class DS2LSOM:
 
         self.som_dim = int((self.n_prototypes) ** (1 / 2))
         self.n_prototypes = self.som_dim**2
-        # self.som_sigma = 0.1 * self.som_dim
 
-        self.som = self._get_prototypes(data)
+        self.quantizer = self._train_quantizer(data)
         # self.win_map = self.som.win_map(data, return_indices=True)
         self._get_dist_matrix(data)
         self.nbr_values, self.prototypes = self._enrich_prototypes()
@@ -102,7 +102,7 @@ class DS2LSOM:
         if self.verbose:
             print("Training finished.")
 
-    def predict(self, data) -> np.ndarray:
+    def predict(self, data: np.ndarray) -> np.ndarray:
         """Return the cluster id for each sample.
 
         Input
@@ -117,9 +117,9 @@ class DS2LSOM:
         """
         #  Get Best Matching Prototype
         if self.method == "som":
-            pred = self.som._distance_from_weights(data).argsort(axis=-1)[:, 0]
+            pred = self.quantizer._distance_from_weights(data).argsort(axis=-1)[:, 0]
         elif self.method == "kmeans":
-            pred = self.som.transform(data).argsort(axis=-1)[:, 0]
+            pred = self.quantizer.transform(data).argsort(axis=-1)[:, 0]
 
         for sample, prototype in enumerate(pred):
             if prototype in self.graph:
@@ -131,11 +131,11 @@ class DS2LSOM:
     def _get_dist_matrix(self, data) -> None:
         """Calculate distance matrix (i, j) for prototype i and sample j."""
         if self.method == "som":
-            self.dist_matrix = self.som._distance_from_weights(data).T
+            self.dist_matrix = self.quantizer._distance_from_weights(data).T
         elif self.method == "kmeans":
-            self.dist_matrix = self.som.transform(data).T
+            self.dist_matrix = self.quantizer.transform(data).T
 
-    def _get_prototypes(self, data) -> Union[MiniSom, KMeans]:
+    def _train_quantizer(self, data) -> Union[MiniSom, KMeans]:
         """Define model and train on data.
 
         Input:
@@ -167,9 +167,10 @@ class DS2LSOM:
             som = MiniSom(**minisom_args_default["init"])
             som.pca_weights_init(data)
             som.train(data=data, **minisom_args_default["train"])
+            self.weights = som.get_weights().reshape(-1, 2)
             return som
 
-        elif self.method == "kmeans":
+        if self.method == "kmeans":
             kmeans_args_default = {
                 "init": {"n_clusters": self.n_prototypes},
                 "train": {"sample_weight": None},
@@ -180,7 +181,10 @@ class DS2LSOM:
                 kmeans_args_default["train"].update(self.model_args["train"])
             kmeans = KMeans(**kmeans_args_default["init"], verbose=self.verbose)
             kmeans.fit(X=data, **kmeans_args_default["train"])
+            self.weights = kmeans.cluster_centers_
             return kmeans
+
+        return None
 
     def _enrich_prototypes(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Enrich each prototype with a local density estimate,
@@ -213,10 +217,10 @@ class DS2LSOM:
         """Estimate local density for each prototype
         from its assigned samples.
         """
-        #  Heuristic for sigma: Mean distance between
-        #  prototype and nearest sample.
         if self.sigma is None:
-            self.sigma = np.nanmean(self.dist_matrix.min(axis=1))
+            sigma = self._calculate_sigma()
+        else:
+            sigma = self.sigma
 
         #  Distances of samples where clostest prototype is prototype
         dist_matrix_sorted = self.dist_matrix.argsort(axis=0)[0]
@@ -224,8 +228,8 @@ class DS2LSOM:
         for prototype in range(len(self.dist_matrix)):
             neighbors = self.dist_matrix[prototype, dist_matrix_sorted == prototype]
             neighbors = neighbors**2
-            neighbors = np.e ** -(neighbors / (2 * self.sigma**2))
-            neighbors = neighbors / self.sigma * np.sqrt(2 * np.pi)
+            neighbors = np.e ** -(neighbors / (2 * sigma**2))
+            neighbors = neighbors / sigma * np.sqrt(2 * np.pi)
             #  Surpress warning about empty slices
             if len(neighbors) > 0:
                 densities[prototype] = np.mean(neighbors)
@@ -233,6 +237,15 @@ class DS2LSOM:
                 densities[prototype] = 0
 
         return densities
+
+    def _calculate_sigma(self):
+        """Heuristic for sigma: Mean distance between
+        prototype and nearest neighbor."""
+        pairwise_prototype_distances = pairwise_distances(self.weights, self.weights)
+        pairwise_prototype_distances.sort(axis=1)
+        clostes_neighbor_distances = pairwise_prototype_distances[:, 1]
+        sigma = np.mean(clostes_neighbor_distances)
+        return sigma
 
     def _estimate_local_variability(self) -> np.ndarray:
         """For each prototype w, variability s is the mean distance
@@ -279,7 +292,7 @@ class DS2LSOM:
             groups: Indices (source, target) of all edges
         """
         indices = np.asarray(self.nbr_values >= self.threshold).nonzero()
-        edges = {index for index in zip(indices[0], indices[1])}
+        edges = set(zip(indices[0], indices[1]))
         edges = pd.DataFrame(edges, columns=["source", "target"])
 
         return edges
@@ -308,7 +321,7 @@ class DS2LSOM:
                 - prototypes.d[edges.loc[i, "source"]]
             )
 
-        positive_edges = edges[edges.gradient > 0]
+        positive_edges = edges[edges.gradient < 0]
         g = nx.from_pandas_edgelist(
             positive_edges,
             source="source",

@@ -3,5 +3,9 @@
     "python.linting.pydocstyleEnabled": false,
     "python.linting.flake8Enabled": false,
     "python.linting.enabled": true,
-    "python.linting.mypyEnabled": true
+    "python.linting.mypyEnabled": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "cSpell.words": [
+        "quantizer"
+    ]
 }
