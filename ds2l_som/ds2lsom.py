@@ -155,7 +155,7 @@ class DS2LSOM:
                 },
                 "train": {
                     #  Five batches
-                    "num_iteration": 5
+                    "num_iteration": 100
                     * len(data)
                 },
             }
@@ -321,13 +321,13 @@ class DS2LSOM:
                 - prototypes.d[edges.loc[i, "source"]]
             )
 
-        positive_edges = edges[edges.gradient < 0]
+        positive_edges = edges[edges.gradient > 0]
         g = nx.from_pandas_edgelist(
             positive_edges,
             source="source",
             target="target",
             edge_attr="gradient",
-            create_using=nx.DiGraph,
+            create_using=nx.Graph,
         )
 
         nx.set_node_attributes(g, prototypes.d, "density")
@@ -342,7 +342,7 @@ class DS2LSOM:
             self.graph.nodes[node]["label"] = node
 
         #  Number of needed iterations
-        longest_path = nx.algorithms.dag.dag_longest_path_length(self.graph)
+        longest_path = nx.diameter(self.graph)
 
         for i in range(longest_path):
             #  Iterate over (node, neighbor) pairs
@@ -368,9 +368,10 @@ class DS2LSOM:
 
         Input : Graph
         """
-        cont = True
-        while cont:
-            cont = False
+        converged = False
+        # cont = True
+        while not converged:
+            # cont = False
             G = self.graph
             for e in G.edges:
                 node_i = G.nodes[e[0]]
@@ -386,7 +387,7 @@ class DS2LSOM:
                 density_max_j = G.nodes[label_j]["density"]
 
                 if density_max_i > 0 and density_max_j > 0:
-                    threshold = (1 / density_max_i + 1 / density_max_j) ** -1
+                    threshold = (density_max_i**-1 + density_max_j**-1) ** -1
                 else:
                     threshold = 0
 
@@ -395,10 +396,12 @@ class DS2LSOM:
                     and density_j > threshold
                     and label_i != label_j
                 ):
-                    cont = True
+                    converged = False
                     self._merge_micro_clusters(
                         G, label_i, label_j, density_max_i, density_max_j
                     )
+                else:
+                    converged = True
         self.graph = G
 
     def _merge_micro_clusters(
