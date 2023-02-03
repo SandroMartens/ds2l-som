@@ -153,7 +153,7 @@ class DS2LSOM:
                     "y": self.som_dim,
                     "input_len": data.shape[1],
                 },
-                "train": {"num_iteration": 100 * len(data)},
+                "train": {"num_iteration": 10 * len(data)},
             }
 
             if self.model_args is not None:
@@ -219,16 +219,16 @@ class DS2LSOM:
             sigma = self.sigma
 
         #  Distances of samples where clostest prototype is prototype
-        dist_matrix_sorted = self.dist_matrix.argsort(axis=0)[0]
+        nearest_prototype_id = self.dist_matrix.argmin(axis=0)
         densities = np.zeros(shape=(self.som_dim * self.som_dim))
         for prototype in range(len(self.dist_matrix)):
-            neighbors = self.dist_matrix[prototype, dist_matrix_sorted == prototype]
-            neighbors = neighbors**2
-            neighbors = np.e ** -(neighbors / (2 * sigma**2))
-            neighbors = neighbors / sigma * np.sqrt(2 * np.pi)
-            #  Surpress warning about empty slices
-            if len(neighbors) > 0:
-                densities[prototype] = np.mean(neighbors)
+            distances = self.dist_matrix[prototype, nearest_prototype_id == prototype]
+            if len(distances) > 0:
+                d = np.mean(
+                    (np.exp(-(distances**2) / (2 * sigma**2)))
+                    / (sigma * np.sqrt(2 * np.pi))
+                )
+                densities[prototype] = d
             else:
                 densities[prototype] = 0
 
