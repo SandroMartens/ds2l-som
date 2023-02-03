@@ -119,7 +119,7 @@ class DS2LSOM:
         if self.method == "som":
             pred = self.quantizer._distance_from_weights(data).argsort(axis=-1)[:, 0]
         elif self.method == "kmeans":
-            pred = self.quantizer.transform(data).argsort(axis=-1)[:, 0]
+            pred = self.quantizer.predict(data)
 
         for sample, prototype in enumerate(pred):
             if prototype in self.graph:
@@ -153,11 +153,7 @@ class DS2LSOM:
                     "y": self.som_dim,
                     "input_len": data.shape[1],
                 },
-                "train": {
-                    #  Five batches
-                    "num_iteration": 100
-                    * len(data)
-                },
+                "train": {"num_iteration": 100 * len(data)},
             }
 
             if self.model_args is not None:
@@ -297,9 +293,8 @@ class DS2LSOM:
 
         return edges
 
-    def _create_graph(self) -> nx.DiGraph:
-        """Create Graph with edges between prototypes. Edges are directed from
-        high density nodes to low density nodes with a positive gradient.
+    def _create_graph(self) -> nx.Graph:
+        """Create Graph with edges between prototypes.
 
         Input:
         ------
@@ -309,24 +304,14 @@ class DS2LSOM:
 
         Output:
         -------
-        Graph object with protoypes and gradients between prototypes
+        Graph object with enriched protoypes.
         """
         edges = self.edge_list
-        #  Filter out prototypes without samples
-        # prototypes = self.prototypes[self.prototypes["d"] > 0]
         prototypes = self.prototypes
-        for i in range(len(edges)):
-            edges.loc[i, "gradient"] = (
-                prototypes.d[edges.loc[i, "target"]]
-                - prototypes.d[edges.loc[i, "source"]]
-            )
-
-        positive_edges = edges[edges.gradient > 0]
         g = nx.from_pandas_edgelist(
-            positive_edges,
+            edges,
             source="source",
             target="target",
-            edge_attr="gradient",
             create_using=nx.Graph,
         )
 
@@ -341,27 +326,33 @@ class DS2LSOM:
         for node in self.graph:
             self.graph.nodes[node]["label"] = node
 
-        #  Number of needed iterations
-        longest_path = nx.diameter(self.graph)
+        #  if there are non connected components, run over each separately
+        components = nx.connected_components(self.graph)
+        for component in components:
+            subgraph = self.graph.subgraph(nodes=component)
+            longest_path = nx.diameter(subgraph)
 
-        for i in range(longest_path):
-            #  Iterate over (node, neighbor) pairs
-            for node, edges in self.graph.pred.items():
+            for i in range(longest_path):
+                #  Iterate over (node, neighbors) pairs
+                for node, nbr_data in subgraph.adj.items():
+                    node_density = subgraph.nodes[node]["density"]
+                    largest_gradient = 0
+                    largest_gradient_neighbor = node
+                    # iterate over neighbors of each node
+                    for nbr in nbr_data:
+                        nbr_density = subgraph.nodes[nbr]["density"]
+                        gradient = nbr_density - node_density
+                        if gradient > largest_gradient:
+                            largest_gradient = gradient
+                            largest_gradient_neighbor = nbr
 
-                #  get largest gradient neighbor
-                largest_gradient = 0
-                largest_gradient_neighbor = node
-                for neighbor, attributes in edges.items():
-                    current_neighbor = neighbor
-                    current_gradient = attributes["gradient"]
+                    self.graph.nodes[node]["label"] = self.graph.nodes[
+                        largest_gradient_neighbor
+                    ]["label"]
 
-                    if current_gradient > largest_gradient:
-                        largest_gradient = current_gradient
-                        largest_gradient_neighbor = current_neighbor
-
-                self.graph.nodes[node]["label"] = self.graph.nodes[
-                    largest_gradient_neighbor
-                ]["label"]
+                    subgraph.nodes[node]["label"] = self.graph.nodes[
+                        largest_gradient_neighbor
+                    ]["label"]
 
     def _final_clustering(self) -> None:
         """Merge clusters according to pairwise density threshold of clusters.
@@ -406,7 +397,7 @@ class DS2LSOM:
 
     def _merge_micro_clusters(
         self,
-        G: nx.DiGraph,
+        G: nx.Graph,
         label_i: int,
         label_j: int,
         density_max_i: float,
